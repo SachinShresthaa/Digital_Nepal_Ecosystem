@@ -1,57 +1,45 @@
-# Maven / Java build outputs
+# Maven
 target/
-*.class
-*.jar
-*.war
-*.nar
-*.ear
-*.zip
-*.tar.gz
-*.rar
+**/target/
+!.mvn/wrapper/maven-wrapper.jar
+.m2/
+.mvn/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+pom.xml.orig
 
-# Logs and temp files
-*.log
-*.tmp
-*.out
-*.swp
-
-# IDE files
+# IntelliJ
 .idea/
-.idea/**
 *.iml
+*.ipr
+*.iws
+
+# VS Code
 .vscode/
 
-# OS files
-.DS_Store
-Thumbs.db
+# Local tooling
+.postman/
 
-# Python artifacts
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Node artifacts
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Logs
+*.log
+hs_err_pid*
+*.tmp
 
 # Environment
 .env
-.env.*
 .env.local
 .env.*.local
 
-# Docker / CI
-.dockerignore
-Dockerfile
-docker-compose.yml
-.github/
-Jenkinsfile
+# OS
+.DS_Store
+Thumbs.db
 
-# Maven caches and temporary files
-.m2/
+# Docker
+docker-compose.override.yml
+docker-compose.*.local.yml
 
-# Other
-.postman/
+# Misc
+*.class
+
