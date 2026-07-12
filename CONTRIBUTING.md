@@ -1,30 +1,46 @@
 # Contributing to Digital Nepal Ecosystem
 
-Thank you for contributing to the Digital Nepal Ecosystem repository. Please follow these guidelines to help us keep the project organized and maintain a high-quality contribution workflow.
+Thank you for contributing! To keep the project secure and maintainable, we follow a strict review and branch protection workflow.
 
-## How to contribute
+## Branch workflow
 
-1. Create an issue first for any significant feature, bug fix, or documentation change.
-2. Checkout `develop`.
-3. Create a feature branch named `feature/<short-description>` or `bugfix/<short-description>`.
-4. Push your branch to GitHub.
-5. Open a pull request targeting `develop`.
-
-## Pull request process
-
-- Include a clear description of the change.
-- Link the related issue.
-- Add testing notes.
-- Ensure all requested reviews pass.
-- Do not merge your own PR without approval.
-
-## Code review
-
-- Keep changes focused and small.
-- Add tests when appropriate.
-- Follow existing coding style.
-
-## Commit messages
-
-- Use present-tense, short summaries.
-- Include issue references when available, e.g. `Fixes #123`.
+- Use `develop` as the main collaborative branch.
+- - Create feature branches from `develop`.
+  - - Keep your branch up to date by regularly pulling or merging the latest `develop`.
+    - - Do not push directly to `develop` or `main`.
+      - - Do not force-push to any shared branch.
+        - - Do not delete `develop` or `main`.
+         
+          - ## Pull requests
+         
+          - - Open a pull request against `develop` for all non-trivial changes.
+            - - Reference the related issue or task, if available.
+              - - Include a short summary of the change, why it was needed, and how it was tested.
+                - - Use the repository PR template when creating the PR.
+                 
+                  - ## Review policy
+                 
+                  - - Only reviewers from the `intersect` team may approve changes to protected branches.
+                    - - `develop` and `main` are protected branches and require review before merge.
+                      - - Changes should be merged only after passing any required checks.
+                        - - If you are not part of the `intersect` maintainer group, do not approve your own PR.
+                         
+                          - ## Coding and commit guidelines
+                         
+                          - - Keep changes focused and small.
+                            - - Use clear, descriptive commit messages.
+                              - - Follow consistent formatting and naming conventions.
+                                - - Run any project tests before submitting your PR.
+                                 
+                                  - ## Communication
+                                 
+                                  - - Add a comment when your work is ready for review.
+                                    - - Address review feedback promptly.
+                                      - - Update the PR description if the implementation changes significantly.
+                                       
+                                        - ## Legal and permissions
+                                       
+                                        - - This repository uses the MIT License for source code rights.
+                                          - - License terms do not replace GitHub access control or branch protection.
+                                            - - Only `intersect` maintainers can approve and merge changes to protected branches.
+                                              - 
