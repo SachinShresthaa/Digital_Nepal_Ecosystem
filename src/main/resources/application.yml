@@ -1,0 +1,188 @@
+spring:
+  application:
+    name: digital-nepal-ecosystem
+
+  # ========================================================================
+  # DATA SOURCE
+  # ========================================================================
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:db}:${DB_PORT:5432}/${DB_NAME:digital_nepal}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 1200000
+
+  # ========================================================================
+  # JPA & HIBERNATE
+  # ========================================================================
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+          fetch_size: 50
+    show-sql: false
+    open-in-view: false
+
+
+
+
+
+  # ========================================================================
+  # JACKSON
+  # ========================================================================
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      indent-output: true
+    deserialization:
+      fail-on-unknown-properties: false
+    time-zone: UTC
+
+  # ========================================================================
+  # SECURITY
+  # ========================================================================
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER:http://localhost:8080}
+
+  # ========================================================================
+  # SERVLET
+  # ========================================================================
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+# ========================================================================
+# SERVER
+# ========================================================================
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /api
+  compression:
+    enabled: true
+    min-response-size: 1024
+  error:
+    include-message: always
+    include-binding-errors: always
+
+# ========================================================================
+# ACTUATOR
+# ========================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,env,loggers
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# ========================================================================
+# LOGGING
+# ========================================================================
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+    np.gov.digital: DEBUG
+    org.springframework: INFO
+    org.hibernate: WARN
+    org.postgresql: WARN
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: /var/log/digital-nepal/application.log
+    max-size: 50MB
+    max-history: 30
+
+# ========================================================================
+# PROFILES
+# ========================================================================
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  jpa:
+    hibernate:
+      ddl-auto: update
+  jackson:
+    serialization:
+      indent-output: true
+
+server:
+  port: 8080
+
+logging:
+  level:
+    root: DEBUG
+    np.gov.digital: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: staging
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+server:
+  port: 8080
+  servlet:
+    session:
+      timeout: 30m
+
+logging:
+  level:
+    root: INFO
+    np.gov.digital: INFO
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  jackson:
+    serialization:
+      indent-output: false
+
+server:
+  port: 8080
+  servlet:
+    session:
+      timeout: 1h
+  ssl:
+    enabled: true
+    key-store: ${SSL_KEYSTORE_PATH}
+    key-store-password: ${SSL_KEYSTORE_PASSWORD}
+    key-store-type: PKCS12
+
+logging:
+  level:
+    root: WARN
+    np.gov.digital: INFO
