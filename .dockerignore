@@ -1,0 +1,44 @@
+# Build and dependency files
+target/
+node_modules/
+*.class
+*.jar
+!app.jar
+*.log
+*.tmp
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.iml
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Maven
+.m2/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+
+# Docker
+.dockerignore
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# CI/CD
+.github/
+Jenkinsfile
+
+# Documentation
+README.md
+*.md
+CHANGELOG.md

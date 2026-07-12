@@ -1,0 +1,23 @@
+FROM eclipse-temurin:21-jre
+
+LABEL maintainer="Digital Nepal DevOps <devops@digital-nepal.gov.np>"
+LABEL description="Digital Nepal Citizen Ecosystem Backend - runtime image (prebuilt jar)"
+
+WORKDIR /opt/digital-nepal
+
+# Copy prebuilt application JAR (CI job places app.jar in build context)
+COPY app.jar /opt/digital-nepal/app.jar
+
+# Create non-root user for security
+RUN groupadd --system --gid 1001 appuser && \
+  useradd --system --uid 1001 --gid appuser --create-home --home-dir /home/appuser appuser && \
+    chown -R appuser:appuser /opt/digital-nepal
+
+USER appuser
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
+
+ENTRYPOINT ["java", "-jar", "/opt/digital-nepal/app.jar"]
