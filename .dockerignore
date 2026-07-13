@@ -26,10 +26,8 @@ Dockerfile
 Dockerfile.runtime
 docker-compose.yml
 
-target/
 # Build output
 **/target/
-*.jar
 *.war
 *.ear
 *.class
