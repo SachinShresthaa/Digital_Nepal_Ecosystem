@@ -38,11 +38,13 @@
                     <skip>false</skip>
                     <finalName>production-app</finalName>
                 </configuration>
-                <executions><execution>
-                <goals><goal>repackage</goal></goals>
-                
-                </execution></executions>
-                
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

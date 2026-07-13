@@ -9,8 +9,8 @@ WORKDIR /opt/digital-nepal
 COPY app.jar /opt/digital-nepal/app.jar
 
 # Create non-root user for security
-RUN groupadd --system --gid 1001 appuser && \
-  useradd --system --uid 1001 --gid appuser --create-home --home-dir /home/appuser appuser && \
+RUN groupadd appuser 2>/dev/null || true && \
+  id -u appuser >/dev/null 2>&1 || useradd --system --create-home --home-dir /home/appuser --gid appuser appuser && \
     chown -R appuser:appuser /opt/digital-nepal
 
 USER appuser

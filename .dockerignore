@@ -1,3 +1,20 @@
+# Build and dependency files
+target/
+node_modules/
+*.class
+*.jar
+!app.jar
+*.log
+*.tmp
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.iml
+.DS_Store
+
 # Git
 .git
 .gitignore
