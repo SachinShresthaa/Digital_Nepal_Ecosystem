@@ -1,19 +1,67 @@
-# Digital Nepal Ecosystem
+# Digital Nepal Citizen Ecosystem
 
-Backend services for Digital Nepal Ecosystem platform by Intersect Info Developers.
+A public backend platform for citizen services in Nepal built with Java 21, Spring Boot, PostgreSQL, and PostGIS.
 
-## Developer setup
+## Project overview
 
-1. Clone the repo and checkout `develop`.
-2. Install dependencies for the service in your runtime stack.
-3. Copy `.env.example` to `.env` and update your local values.
-4. Start with Docker if the service supports it:
-   - `docker compose up --build`
-5. For local development, use the app-specific startup command once dependencies are installed.
+This repository contains the backend services and DevOps configuration for the Digital Nepal ecosystem.
 
-## Security and branch rules
+### Key components
 
-- Use `security.md` for security guidance.
-- Do not commit secrets or `.env` files.
-- Use pull requests for changes to `develop` and `main`.
-- Avoid force pushes to protected branches.
+- `modules/stub-backend` - the runnable Spring Boot application used by CI and Docker
+- `db/migrations` - database schema and migration scripts
+- `.github/workflows/ci.yml` - GitHub Actions CI/CD pipeline
+- `docker-compose.yml` - local development orchestration
+- `scripts/` - helper scripts for deployment, backup, and health checks
+- `CONTRIBUTING.md` - collaboration guidelines
+- `.github/PULL_REQUEST_TEMPLATE.md` - PR template for consistent review
+
+## Getting started
+
+### Prerequisites
+
+- Java 21
+- Maven 3.9+
+- Docker 24+
+- Docker Compose 3.8+
+- Git
+
+### Local startup
+
+```bash
+git clone https://github.com/intersectinfodevelopers/Digital_Nepal_Ecosystem.git
+cd Digital_Nepal_Ecosystem
+cp .env.example .env
+./mvnw clean package -DskipTests
+docker compose up -d
+```
+
+### Health check
+
+```bash
+make health-check
+docker compose logs -f
+```
+
+## Collaboration guide
+
+- `main` is the release branch.
+- `develop` is the active collaboration branch.
+- Create feature branches from `develop`.
+- Always pull before push.
+- Open PRs against `develop` for routine work.
+- Use the PR template and request at least one review.
+
+## CI/CD
+
+GitHub Actions validates PRs and builds the application. The workflow runs on push and pull requests targeting `main`, `develop`, and `dev`.
+
+## Public repository practices
+
+- Do not commit secrets.
+- Use `.env.example` for local configuration.
+- Keep PRs small, descriptive, and reviewed.
+
+## License
+
+This project is public and currently maintained by Intersect Info Developers.

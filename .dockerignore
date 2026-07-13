@@ -1,13 +1,46 @@
+# Git
 .git
-.github
 .gitignore
+.gitattributes
+
+# Docker config
+.dockerignore
 Dockerfile
+Dockerfile.runtime
 docker-compose.yml
-node_modules
-venv
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-*.log
+
+target/
+# Build output
+**/target/
+*.jar
+*.war
+*.ear
+*.class
+
+# Maven
+.m2/
+.mvn/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+pom.xml.orig
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+*.swp
+*.swo
+.DS_Store
+
+# Environment
 .env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+*.tmp
