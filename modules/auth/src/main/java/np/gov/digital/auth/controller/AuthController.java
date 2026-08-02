@@ -1,44 +1,49 @@
 package np.gov.digital.auth.controller;
 
-import np.gov.digital.auth.Dto.UserDto;
-import np.gov.digital.auth.Services.AuthService;
-import np.gov.digital.auth.exception.UserException;
-import np.gov.digital.auth.response.AuthResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import np.gov.digital.auth.dto.*;
+import np.gov.digital.auth.service.AuthService;
+import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.parameters.P;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
 public class AuthController {
 
-
-    private AuthService authService;
-
-    public AuthController(AuthService authService) {
-        this.authService = authService;
-    }
-
-    @PostMapping("/signup")
-    public ResponseEntity<AuthResponse> signupHandeler(
-            @RequestBody UserDto userDto
-            ) throws UserException {
-
-        return ResponseEntity.ok(authService.signup(userDto));
-
-    }
-
-
+    private final AuthService authService;
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> LoginHandeler(
-            @RequestBody UserDto userDto
-    ) throws UserException {
+    public ResponseEntity<LoginResponse> login(
+            @Valid @RequestBody LoginRequest request) {
 
-        return ResponseEntity.ok(authService.login(userDto));
+        return ResponseEntity.ok(authService.login(request));
+    }
 
+    @PostMapping("/refresh")
+    public ResponseEntity<RefreshTokenResponse> refreshToken(
+            @RequestBody @Valid RefreshTokenRequest request) {
+
+        return ResponseEntity.ok(authService.refreshToken(request));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @RequestBody @Valid LogoutRequest request) {
+
+        authService.logout(request);
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<UserProfileResponse> me(
+            Authentication authentication) {
+
+        return ResponseEntity.ok(
+                authService.me(authentication)
+        );
     }
 }
