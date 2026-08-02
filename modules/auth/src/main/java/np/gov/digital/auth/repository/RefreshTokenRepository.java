@@ -1,0 +1,17 @@
+package np.gov.digital.auth.repository;
+
+import np.gov.digital.auth.entity.RefreshToken;
+import np.gov.digital.auth.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+import java.util.UUID;
+
+public interface RefreshTokenRepository
+        extends JpaRepository<RefreshToken, UUID> {
+
+    Optional<RefreshToken> findByToken(String token);
+
+    void deleteByUser(User user);
+
+}
