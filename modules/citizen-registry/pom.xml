@@ -37,6 +37,11 @@
             <artifactId>platform-audit</artifactId>
             <version>1.0.0</version>
         </dependency>
+        <dependency>
+            <groupId>np.gov.digital</groupId>
+            <artifactId>platform-audit</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
