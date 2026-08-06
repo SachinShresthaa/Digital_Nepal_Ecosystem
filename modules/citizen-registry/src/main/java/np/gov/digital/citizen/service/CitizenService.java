@@ -1,0 +1,183 @@
+package np.gov.digital.citizen.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import np.gov.digital.citizen.dto.CitizenRegistrationRequest;
+import np.gov.digital.citizen.dto.CitizenRegistrationResponse;
+import np.gov.digital.citizen.entity.Citizen;
+import np.gov.digital.citizen.entity.Ward;
+import np.gov.digital.citizen.enums.RelationType;
+import np.gov.digital.citizen.enums.SyncStatus;
+import np.gov.digital.citizen.exception.DuplicateNidException;
+import np.gov.digital.citizen.exception.WardNotFoundException;
+import np.gov.digital.citizen.repository.CitizenRepository;
+import np.gov.digital.citizen.repository.WardRepository;
+import np.gov.digital.citizen.util.NidEncryptionUtil;
+import np.gov.digital.platformaudit.audit.AuditEventType;
+import np.gov.digital.platformaudit.audit.AuditLogService;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class CitizenService {
+
+    private final CitizenRepository citizenRepository;
+    private final WardRepository wardRepository;
+    private final NidEncryptionUtil nidEncryptionUtil;
+    private final AuditLogService auditLogService;
+    private final FamilyLinkService familyLinkService;
+    private final EligibilityService eligibilityService;
+
+    // REGISTRATION
+    @Transactional
+    public CitizenRegistrationResponse registerCitizen(CitizenRegistrationRequest request) {
+
+        // STEP 1 — Validate ward
+        Ward ward = wardRepository.findById(request.getWardId())
+                .orElseThrow(() -> new WardNotFoundException(request.getWardId()));
+
+        // STEP 2 — Hash NID for duplicate check
+        String nidHash = nidEncryptionUtil.hash(request.getNid());
+
+        // STEP 3 — Duplicate check
+        if (citizenRepository.existsByNidHashAndIsActiveTrue(nidHash)) {
+            log.warn("Duplicate NID registration attempt — nidHash: {}", nidHash);
+            auditLogService.log(
+                    AuditEventType.DUPLICATE_NID_ATTEMPT,
+                    null,
+                    "Duplicate NID attempt — hash: " + nidHash
+            );
+            throw new DuplicateNidException(nidHash);
+        }
+
+        // STEP 4 — Encrypt PII fields
+        String nidEnc            = nidEncryptionUtil.encrypt(request.getNid());
+        String citizenshipNoEnc  = nidEncryptionUtil.encrypt(request.getCitizenshipNo());
+        String citizenshipNoNorm = nidEncryptionUtil.normalizeCitizenshipNo(request.getCitizenshipNo());
+        String dobEnc            = nidEncryptionUtil.encrypt(request.getDob());
+        String phoneEnc          = request.getPhone() != null
+                ? nidEncryptionUtil.encrypt(request.getPhone()) : null;
+        String phoneAltEnc       = request.getPhoneAlt() != null
+                ? nidEncryptionUtil.encrypt(request.getPhoneAlt()) : null;
+        String emailEnc          = request.getEmail() != null
+                ? nidEncryptionUtil.encrypt(request.getEmail()) : null;
+        String passportNoEnc     = request.getPassportNo() != null
+                ? nidEncryptionUtil.encrypt(request.getPassportNo()) : null;
+
+        // STEP 5 — Get actor from SecurityContext
+        UUID actorId = getActorId();
+
+        // STEP 6 — Build and save citizen
+        Citizen citizen = Citizen.builder()
+                .ward(ward)
+                .nidEnc(nidEnc)
+                .nidHash(nidHash)
+                .citizenshipNoEnc(citizenshipNoEnc)
+                .citizenshipNoNorm(citizenshipNoNorm)
+                .passportNoEnc(passportNoEnc)
+                .nameNp(request.getNameNp())
+                .nameEn(request.getNameEn())
+                .dobEnc(dobEnc)
+                .sex(request.getSex())
+                .bloodGroup(request.getBloodGroup())
+                .religion(request.getReligion())
+                .ethnicity(request.getEthnicity())
+                .motherTongue(request.getMotherTongue())
+                .tole(request.getTole())
+                .phoneEnc(phoneEnc)
+                .phoneAltEnc(phoneAltEnc)
+                .emailEnc(emailEnc)
+                .digitalLiteracy(request.getDigitalLiteracy())
+                .hasSmartphone(request.getHasSmartphone() != null ? request.getHasSmartphone() : false)
+                .photoUrl(request.getPhotoUrl())
+                .consentRecordedAt(Instant.now())
+                .consentChannel(request.getConsentChannel())
+                .syncStatus(SyncStatus.SYNCED)
+                .localRecordId(request.getLocalRecordId())
+                .deviceId(request.getDeviceId())
+                .registrationChannel(request.getRegistrationChannel())
+                .nidVerified(false)
+                .isAsyncVerified(false)
+                .isActive(true)
+                .versionNumber(1)
+                .createdBy(actorId)
+                .build();
+
+        Citizen saved = citizenRepository.save(citizen);
+
+        // STEP 7 — Write audit log
+        auditLogService.log(
+                AuditEventType.CITIZEN_REGISTERED,
+                saved.getId(),
+                "Citizen registered in ward: " + ward.getId()
+        );
+
+        // STEP 8 — Family tree linking
+        // Build map of RelationType → normalized citizenship number from request
+        Map<RelationType, String> familyMemberNos = buildFamilyMap(request);
+        if (!familyMemberNos.isEmpty()) {
+            familyLinkService.createFamilyLinks(saved, familyMemberNos);
+        }
+
+        // STEP 9 — Resolve any PENDING links waiting for this citizen
+        familyLinkService.resolvePendingLinks(saved);
+
+        // STEP 10 — Run eligibility engine
+        eligibilityService.evaluate(saved.getId());
+        log.info("Eligibility evaluated for citizen: {}", saved.getId());
+
+        log.info("Citizen registered — citizenId: {}, wardId: {}", saved.getId(), ward.getId());
+
+        return CitizenRegistrationResponse.builder()
+                .citizenId(saved.getId())
+                .nameNp(saved.getNameNp())
+                .nameEn(saved.getNameEn())
+                .wardId(ward.getId())
+                .nidVerified(saved.getNidVerified())
+                .syncStatus(saved.getSyncStatus().name())
+                .registeredAt(saved.getCreatedAt())
+                .message("Citizen registered successfully. ID: " + saved.getId())
+                .build();
+    }
+
+    // PRIVATE HELPERS
+
+    /**
+     * Builds family member map from registration request.
+     * Add more relation types here as the request DTO grows.
+     */
+    private Map<RelationType, String> buildFamilyMap(CitizenRegistrationRequest request) {
+        Map<RelationType, String> map = new HashMap<>();
+        // These fields will be added to CitizenRegistrationRequest in Day 3
+        // For now the map is built from whatever family fields exist
+        // Example:
+        // if (request.getFatherCitizenshipNo() != null)
+        //     map.put(RelationType.FATHER, nidEncryptionUtil.normalizeCitizenshipNo(request.getFatherCitizenshipNo()));
+        // if (request.getMotherCitizenshipNo() != null)
+        //     map.put(RelationType.MOTHER, nidEncryptionUtil.normalizeCitizenshipNo(request.getMotherCitizenshipNo()));
+        // if (request.getSpouseCitizenshipNo() != null)
+        //     map.put(RelationType.SPOUSE, nidEncryptionUtil.normalizeCitizenshipNo(request.getSpouseCitizenshipNo()));
+        return map;
+    }
+
+    private UUID getActorId() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getName() != null) {
+                return UUID.fromString(auth.getName());
+            }
+        } catch (Exception e) {
+            log.warn("Could not extract actor ID from SecurityContext — using placeholder");
+        }
+        return UUID.fromString("00000000-0000-0000-0000-000000000001");
+    }
+}

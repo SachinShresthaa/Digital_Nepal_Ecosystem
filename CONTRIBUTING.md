@@ -1,46 +1,73 @@
 # Contributing to Digital Nepal Ecosystem
 
-Thank you for contributing! To keep the project secure and maintainable, we follow a strict review and branch protection workflow.
+Thank you for contributing! This project is public and welcomes collaborators.
 
-## Branch workflow
+## Branch strategy
 
-- Use `develop` as the main collaborative branch.
-- - Create feature branches from `develop`.
-  - - Keep your branch up to date by regularly pulling or merging the latest `develop`.
-    - - Do not push directly to `develop` or `main`.
-      - - Do not force-push to any shared branch.
-        - - Do not delete `develop` or `main`.
-         
-          - ## Pull requests
-         
-          - - Open a pull request against `develop` for all non-trivial changes.
-            - - Reference the related issue or task, if available.
-              - - Include a short summary of the change, why it was needed, and how it was tested.
-                - - Use the repository PR template when creating the PR.
-                 
-                  - ## Review policy
-                 
-                  - - Only reviewers from the `intersect` team may approve changes to protected branches.
-                    - - `develop` and `main` are protected branches and require review before merge.
-                      - - Changes should be merged only after passing any required checks.
-                        - - If you are not part of the `intersect` maintainer group, do not approve your own PR.
-                         
-                          - ## Coding and commit guidelines
-                         
-                          - - Keep changes focused and small.
-                            - - Use clear, descriptive commit messages.
-                              - - Follow consistent formatting and naming conventions.
-                                - - Run any project tests before submitting your PR.
-                                 
-                                  - ## Communication
-                                 
-                                  - - Add a comment when your work is ready for review.
-                                    - - Address review feedback promptly.
-                                      - - Update the PR description if the implementation changes significantly.
-                                       
-                                        - ## Legal and permissions
-                                       
-                                        - - This repository uses the MIT License for source code rights.
-                                          - - License terms do not replace GitHub access control or branch protection.
-                                            - - Only `intersect` maintainers can approve and merge changes to protected branches.
-                                              - 
+- `main` is the protected release branch.
+- `develop` is the shared integration branch for active development.
+- Create feature branches from `develop`: `feature/<name>`, `bugfix/<name>`, `hotfix/<name>`.
+- Do not push directly to `main` or `develop`.
+
+## Always pull before push
+
+Before you start work:
+
+```bash
+git checkout develop
+git pull origin develop
+git checkout -b feature/<short-description>
+```
+
+Before you push:
+
+```bash
+git add .
+git commit -m "<short summary>"
+git pull --rebase origin develop
+git push origin feature/<short-description>
+```
+
+## Pull request workflow
+
+- Open PRs against `develop` for routine work.
+- Open PRs against `main` only for hotfixes or release updates from `develop`.
+- Use the `.github/PULL_REQUEST_TEMPLATE.md`.
+- Do not approve your own PR.
+- Request at least one approving review from another collaborator.
+
+## Review policy
+
+- Each PR should have at least one approval before merge.
+- Fix review comments by updating the branch and pushing again.
+- Keep changes small and focused.
+- Add a description of what changed and how it was tested.
+
+## GitHub Actions
+
+- CI is enabled for PRs to `develop` and `main`.
+- Builds also run on push to `develop` and `main`.
+- The workflow publishes a Docker image when the branch is `develop` or `main`.
+
+## Local development
+
+- Use `.env.example` as a template; do not commit secrets.
+- Run unit tests with:
+
+```bash
+./mvnw test
+```
+
+- Build locally with:
+
+```bash
+./mvnw clean package -DskipTests
+```
+
+## Public collaboration
+
+- Keep the repository public-friendly:
+  - add clear descriptions
+  - avoid secret data in commits
+  - create clean PRs
+- This project is open to contributors and maintains a standard review process.
