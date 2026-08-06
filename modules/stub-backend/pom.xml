@@ -26,6 +26,16 @@
             <artifactId>employment-service</artifactId>
             <version>1.0.0</version>
         </dependency>
+        <dependency>
+            <groupId>np.gov.digital</groupId>
+            <artifactId>platform-sync</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>np.gov.digital</groupId>
+            <artifactId>citizen-registry-service</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
     </dependencies>
 

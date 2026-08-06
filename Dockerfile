@@ -25,7 +25,7 @@ RUN chmod +x mvnw || true
 RUN apt-get update && apt-get install -y --no-install-recommends curl unzip ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Use the wrapper to build the project
-RUN ./mvnw -B -T1C -DskipTests clean package -pl modules/stub-backend -am
+RUN ./mvnw -B  -DskipTests clean package -pl modules/stub-backend -am
 
 # Target the explicitly named production binary—no wildcards, no guessing!
 RUN mkdir -p /build-output && \
