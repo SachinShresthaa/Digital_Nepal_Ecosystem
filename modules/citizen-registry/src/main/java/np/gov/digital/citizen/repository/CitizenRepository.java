@@ -30,7 +30,18 @@ public interface CitizenRepository extends JpaRepository<Citizen, UUID> {
             Pageable pageable
     );
 
+
     Optional<Citizen> findByLocalRecordId(UUID localRecordId);
+
+    @Query("""
+       SELECT c.versionNumber
+       FROM Citizen c
+       WHERE c.localRecordId = :localRecordId
+       """)
+    Optional<Integer> findVersionByLocalRecordId(
+            @Param("localRecordId") UUID localRecordId);
+
+
 
     @Query("SELECT c FROM Citizen c WHERE c.isAsyncVerified = false AND c.isActive = true AND c.ward.id = :wardId")
     Page<Citizen> findPendingNidVerification(@Param("wardId") UUID wardId, Pageable pageable);
