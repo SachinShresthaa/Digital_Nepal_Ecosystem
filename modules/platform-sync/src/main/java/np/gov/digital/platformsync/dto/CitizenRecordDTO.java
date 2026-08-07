@@ -63,4 +63,6 @@ public class CitizenRecordDTO {
     // OFFLINE SYNC
     private UUID localRecordId;
     private String deviceId;
+    // OFFLINE VERSIONING
+    private Integer versionNumber;
 }
