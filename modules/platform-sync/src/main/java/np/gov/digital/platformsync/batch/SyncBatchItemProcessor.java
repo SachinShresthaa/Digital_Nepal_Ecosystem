@@ -1,11 +1,11 @@
-package np.gov.digital.platformsync.batch;
 
-
+        package np.gov.digital.platformsync.batch;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import np.gov.digital.citizen.dto.CitizenRegistrationRequest;
 import np.gov.digital.citizen.entity.Citizen;
+import np.gov.digital.citizen.enums.SyncStatus;
 import np.gov.digital.citizen.repository.CitizenRepository;
 import np.gov.digital.citizen.service.CitizenService;
 import np.gov.digital.platformsync.dto.CitizenRecordDTO;
@@ -29,20 +29,27 @@ public class SyncBatchItemProcessor
     private final SyncConflictRegistryRepository conflictRepository;
     private final ObjectMapper objectMapper;
     private final CitizenMapper citizenMapper;
-
     private final CitizenService citizenService;
 
     @Override
     public SyncRecord process(SyncRecord syncRecord) throws Exception {
 
+        // ----------------------------------------------------
+        // READ SYNC PAYLOAD
+        // ----------------------------------------------------
         CitizenRecordDTO dto =
                 objectMapper.readValue(
                         syncRecord.getPayload(),
                         CitizenRecordDTO.class
                 );
 
+        // ----------------------------------------------------
+        // FIND EXISTING CITIZEN
+        // ----------------------------------------------------
         Optional<Citizen> existingCitizen =
-                citizenRepository.findByLocalRecordId(dto.getLocalRecordId());
+                citizenRepository.findByLocalRecordId(
+                        dto.getLocalRecordId()
+                );
 
         // ----------------------------------------------------
         // NEW CITIZEN
@@ -63,6 +70,7 @@ public class SyncBatchItemProcessor
             return syncRecord;
         }
 
+        // Existing citizen found
         Citizen citizen = existingCitizen.get();
 
         // ----------------------------------------------------
@@ -70,15 +78,18 @@ public class SyncBatchItemProcessor
         // ----------------------------------------------------
         if (citizen.getVersionNumber().equals(dto.getVersionNumber())) {
 
-            CitizenRegistrationRequest request =
-                    citizenMapper.toRegistrationRequest(
-                            dto,
-                            dto.getDeviceId()
-                    );
+            /*
+             * The citizen already exists.
+             *
+             * DO NOT call registerCitizen() here because it performs
+             * duplicate-NID validation and may reject this record.
+             *
+             * Actual citizen update functionality will be implemented
+             * through citizenService.updateCitizen(...) later.
+             */
 
-            // TODO: Replace with citizenService.updateCitizen(request)
-            // when update functionality is implemented.
-            citizenService.registerCitizen(request);
+            citizen.setSyncStatus(SyncStatus.SYNCED);
+            citizenRepository.save(citizen);
 
             syncRecord.setStatus(SyncRecordStatus.SYNCED);
             syncRecord.setProcessedAt(Instant.now());
@@ -89,7 +100,8 @@ public class SyncBatchItemProcessor
         // ----------------------------------------------------
         // VERSION CONFLICT
         // ----------------------------------------------------
-        SyncConflictRegistry conflict = new SyncConflictRegistry();
+        SyncConflictRegistry conflict =
+                new SyncConflictRegistry();
 
         conflict.setCitizenId(citizen.getId());
         conflict.setSubmittingUserId(null);
@@ -101,9 +113,15 @@ public class SyncBatchItemProcessor
 
         conflictRepository.save(conflict);
 
+        // Mark the actual citizen as CONFLICT
+        citizen.setSyncStatus(SyncStatus.CONFLICT);
+        citizenRepository.save(citizen);
+
+        // Mark the sync record as CONFLICT
         syncRecord.setStatus(SyncRecordStatus.CONFLICT);
         syncRecord.setProcessedAt(Instant.now());
 
         return syncRecord;
     }
 }
+
