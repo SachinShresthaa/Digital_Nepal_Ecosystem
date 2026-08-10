@@ -5,9 +5,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 
-import np.gov.digital.platformsync.dto.CitizenRecordDTO;
-import np.gov.digital.platformsync.dto.SyncBatchRequestDTO;
-import np.gov.digital.platformsync.dto.SyncResponseDTO;
+import np.gov.digital.platformsync.dto.*;
 import np.gov.digital.platformsync.entity.SyncBatch;
 import np.gov.digital.platformsync.entity.SyncRecord;
 import np.gov.digital.platformsync.mapper.CitizenMapper;
@@ -16,6 +14,8 @@ import np.gov.digital.platformsync.repository.SyncRecordRepository;
 import org.springframework.stereotype.Service;
 import np.gov.digital.platformsync.enums.SyncRecordStatus;
 import java.time.Instant;
+import java.util.UUID;
+
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
@@ -32,6 +32,7 @@ public class SyncService {
 
     private final Job syncJob;
 
+
     @Transactional
     public SyncResponseDTO processBatch(SyncBatchRequestDTO requestDTO) {
 
@@ -43,7 +44,8 @@ public class SyncService {
             return SyncResponseDTO.builder()
                     .batchId(requestDTO.getBatchId())
                     .status("DUPLICATE_BATCH")
-                    .message("Batch already processed.")
+                    .errorCode("ERR_SYNC_BATCH_DUPLICATE")
+                    .message("Batch has already been processed.")
                     .build();
         }
 
@@ -177,4 +179,66 @@ public class SyncService {
 
         }
     }
+    public SyncBatchStatusResponseDTO getBatchStatus(UUID batchId) {
+
+        SyncBatch batch = syncBatchRepository.findById(batchId)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Sync batch not found: " + batchId
+                        )
+                );
+
+        return SyncBatchStatusResponseDTO.builder()
+                .batchId(batch.getBatchId())
+                .wardId(batch.getWardId())
+                .deviceId(batch.getDeviceId())
+                .recordCount(batch.getRecordCount())
+                .conflictCount(batch.getConflictCount())
+                .status(batch.getStatus())
+                .submittedAt(batch.getSubmittedAt())
+                .completedAt(batch.getCompletedAt())
+                .errorMessage(batch.getErrorMessage())
+                .build();
+    }
+
+    public WardSyncStatusResponseDTO getWardSyncStatus(UUID wardId) {
+
+        int totalBatches =
+                (int) syncBatchRepository.countByWardId(wardId);
+
+        int processingBatches =
+                (int) syncBatchRepository.countByWardIdAndStatus(
+                        wardId,
+                        "PROCESSING"
+                );
+
+        int completedBatches =
+                (int) syncBatchRepository.countByWardIdAndStatus(
+                        wardId,
+                        "COMPLETED"
+                );
+
+        int failedBatches =
+                (int) syncBatchRepository.countByWardIdAndStatus(
+                        wardId,
+                        "FAILED"
+                );
+
+        int conflictBatches =
+                (int) syncBatchRepository.countByWardIdAndStatus(
+                        wardId,
+                        "CONFLICT"
+                );
+
+        return WardSyncStatusResponseDTO.builder()
+                .wardId(wardId)
+                .totalBatches(totalBatches)
+                .processingBatches(processingBatches)
+                .completedBatches(completedBatches)
+                .failedBatches(failedBatches)
+                .conflictBatches(conflictBatches)
+                .build();
+    }
+
+
 }

@@ -1,4 +1,5 @@
-package np.gov.digital.platformsync.dto;
+
+        package np.gov.digital.platformsync.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,7 +23,8 @@ public class SyncResponseDTO {
 
     /**
      * Sync result status.
-     * Example:
+     *
+     * Examples:
      * SUCCESS
      * DUPLICATE_BATCH
      * FAILED
@@ -30,7 +32,16 @@ public class SyncResponseDTO {
     private String status;
 
     /**
+     * Explicit API error code.
+     *
+     * Example:
+     * ERR_SYNC_BATCH_DUPLICATE
+     */
+    private String errorCode;
+
+    /**
      * Human-readable response message.
      */
     private String message;
 }
+
