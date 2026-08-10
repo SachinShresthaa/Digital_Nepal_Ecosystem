@@ -1,6 +1,5 @@
-package np.gov.digital.platformsync.batch;
 
-
+        package np.gov.digital.platformsync.batch;
 
 import lombok.RequiredArgsConstructor;
 import np.gov.digital.platformsync.entity.SyncRecord;
@@ -10,7 +9,6 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.item.database.JpaPagingItemReader;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -30,6 +28,7 @@ public class SyncBatchJobConfig {
     private final SyncBatchItemWriter writer;
 
     private final SyncBatchRetryListener syncBatchRetryListener;
+
     @Bean
     public Step syncStep() {
 
@@ -43,17 +42,22 @@ public class SyncBatchJobConfig {
 
                 .writer(writer)
 
-                .listener(syncBatchRetryListener)
-
                 .faultTolerant()
 
+                // Retry a failed record up to 3 times
                 .retry(Exception.class)
-
                 .retryLimit(3)
 
+                // After retries are exhausted, skip the record
+                // so the rest of the batch can continue.
+                .skip(Exception.class)
+                .skipLimit(Integer.MAX_VALUE)
+
+                // Listener tracks retry count and marks
+                // SyncRecord/Citizen as FAILED after 3 attempts.
+                .listener(syncBatchRetryListener)
+
                 .build();
-
-
     }
 
     @Bean
@@ -66,3 +70,4 @@ public class SyncBatchJobConfig {
                 .build();
     }
 }
+
