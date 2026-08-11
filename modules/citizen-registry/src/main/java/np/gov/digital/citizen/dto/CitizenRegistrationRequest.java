@@ -72,4 +72,6 @@ public class CitizenRegistrationRequest {
     private UUID localRecordId;
 
     private String deviceId;
+
+    private GpsDto gps;
 }
