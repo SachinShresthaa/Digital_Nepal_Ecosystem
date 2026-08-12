@@ -15,6 +15,8 @@ import np.gov.digital.citizen.repository.WardRepository;
 import np.gov.digital.citizen.util.NidEncryptionUtil;
 import np.gov.digital.platformaudit.audit.AuditEventType;
 import np.gov.digital.platformaudit.audit.AuditLogService;
+import np.gov.digital.platformgis.dto.GpsCaptureRequest;
+import np.gov.digital.platformgis.service.CitizenGisService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,7 @@ public class CitizenService {
     private final AuditLogService auditLogService;
     private final FamilyLinkService familyLinkService;
     private final EligibilityService eligibilityService;
+    private final CitizenGisService citizenGisService;
 
     // REGISTRATION
     @Transactional
@@ -121,6 +124,24 @@ public class CitizenService {
                 "Citizen registered in ward: " + ward.getId()
         );
 
+        if (request.getGps() != null) {
+            GpsCaptureRequest gpsCaptureRequest = GpsCaptureRequest.builder()
+                    .latitude(request.getGps().getLatitude())
+                    .longitude(request.getGps().getLongitude())
+                    .accuracyM(request.getGps().getAccuracyM())
+                    .elevationM(request.getGps().getElevationM())
+                    .riskZone(request.getGps().getRiskZone())
+                    .build();
+
+            citizenGisService.captureAndStore(
+                    saved.getId(),
+                    ward.getId(),
+                    actorId,
+                    gpsCaptureRequest
+            );
+            log.info("GPS captured for citizen: {}", saved.getId());
+        }
+
         // STEP 8 — Family tree linking
         // Build map of RelationType → normalized citizenship number from request
         Map<RelationType, String> familyMemberNos = buildFamilyMap(request);
@@ -157,15 +178,6 @@ public class CitizenService {
      */
     private Map<RelationType, String> buildFamilyMap(CitizenRegistrationRequest request) {
         Map<RelationType, String> map = new HashMap<>();
-        // These fields will be added to CitizenRegistrationRequest in Day 3
-        // For now the map is built from whatever family fields exist
-        // Example:
-        // if (request.getFatherCitizenshipNo() != null)
-        //     map.put(RelationType.FATHER, nidEncryptionUtil.normalizeCitizenshipNo(request.getFatherCitizenshipNo()));
-        // if (request.getMotherCitizenshipNo() != null)
-        //     map.put(RelationType.MOTHER, nidEncryptionUtil.normalizeCitizenshipNo(request.getMotherCitizenshipNo()));
-        // if (request.getSpouseCitizenshipNo() != null)
-        //     map.put(RelationType.SPOUSE, nidEncryptionUtil.normalizeCitizenshipNo(request.getSpouseCitizenshipNo()));
         return map;
     }
 
