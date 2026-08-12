@@ -5,15 +5,21 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 
+import np.gov.digital.citizen.entity.Citizen;
+import np.gov.digital.citizen.enums.SyncStatus;
+import np.gov.digital.citizen.repository.CitizenRepository;
 import np.gov.digital.platformsync.dto.*;
 import np.gov.digital.platformsync.entity.SyncBatch;
+import np.gov.digital.platformsync.entity.SyncConflictRegistry;
 import np.gov.digital.platformsync.entity.SyncRecord;
 import np.gov.digital.platformsync.mapper.CitizenMapper;
 import np.gov.digital.platformsync.repository.SyncBatchRepository;
+import np.gov.digital.platformsync.repository.SyncConflictRegistryRepository;
 import np.gov.digital.platformsync.repository.SyncRecordRepository;
 import org.springframework.stereotype.Service;
 import np.gov.digital.platformsync.enums.SyncRecordStatus;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.batch.core.Job;
@@ -31,8 +37,8 @@ public class SyncService {
     private final JobLauncher jobLauncher;
 
     private final Job syncJob;
-
-
+    private final SyncConflictRegistryRepository conflictRepository;
+    private final CitizenRepository citizenRepository;
     @Transactional
     public SyncResponseDTO processBatch(SyncBatchRequestDTO requestDTO) {
 
@@ -239,6 +245,212 @@ public class SyncService {
                 .conflictBatches(conflictBatches)
                 .build();
     }
+    public ConflictResponseDTO resolveConflict(
+            UUID conflictId,
+            ConflictResolutionRequestDTO request
+    ) throws Exception {
 
+        SyncConflictRegistry conflict =
+                conflictRepository.findById(conflictId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Sync conflict not found: " + conflictId
+                                )
+                        );
+
+        // ----------------------------------------------------
+        // PREVENT DOUBLE RESOLUTION
+        // ----------------------------------------------------
+        if (!"PENDING_REVIEW".equals(conflict.getResolutionStatus())) {
+            throw new IllegalStateException(
+                    "Conflict has already been resolved."
+            );
+        }
+        Citizen citizen =
+                citizenRepository.findById(conflict.getCitizenId())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Citizen not found: "
+                                                + conflict.getCitizenId()
+                                )
+                        );
+
+        // ----------------------------------------------------
+        // VALIDATE MERGE DATA
+        // ----------------------------------------------------
+        if ("MERGE".equals(request.getResolution())
+                && (request.getMergedData() == null
+                || request.getMergedData().isBlank())) {
+
+            throw new IllegalArgumentException(
+                    "mergedData is required for MERGE resolution."
+            );
+        }
+
+        // ----------------------------------------------------
+        // RESOLUTION
+        // ----------------------------------------------------
+        switch (request.getResolution()) {
+
+            case "SERVER":
+
+                // Keep the existing server-side citizen data.
+                citizen.setSyncStatus(SyncStatus.SYNCED);
+
+                conflict.setResolutionStatus("RESOLVED_SERVER");
+
+                break;
+
+            case "DEVICE":
+
+                /*
+                 * The device version is accepted.
+                 *
+                 * Actual citizen field updates will be connected
+                 * to CitizenService.updateCitizen() once that method
+                 * is available.
+                 */
+                citizen.setSyncStatus(SyncStatus.SYNCED);
+
+                conflict.setResolutionStatus("RESOLVED_DEVICE");
+
+                break;
+
+            case "MERGE":
+
+                if (request.getMergedData() == null
+                        || request.getMergedData().isBlank()) {
+
+                    throw new IllegalArgumentException(
+                            "mergedData is required for MERGE resolution."
+                    );
+                }
+
+                /*
+                 * Actual merged citizen data update will be connected
+                 * to the Citizen update service.
+                 */
+                citizen.setSyncStatus(SyncStatus.SYNCED);
+
+                conflict.setResolutionStatus("RESOLVED_MERGE");
+
+                break;
+
+            default:
+
+                throw new IllegalArgumentException(
+                        "Invalid resolution: "
+                                + request.getResolution()
+                );
+        }
+        citizenRepository.save(citizen);
+        // ----------------------------------------------------
+        // RESOLUTION AUDIT INFORMATION
+        // ----------------------------------------------------
+        conflict.setResolvedBy(request.getResolvedBy());
+        conflict.setResolvedAt(Instant.now());
+
+        SyncConflictRegistry savedConflict =
+                conflictRepository.save(conflict);
+
+        return ConflictResponseDTO.builder()
+                .id(savedConflict.getId())
+                .citizenId(savedConflict.getCitizenId())
+                .submittingUserId(savedConflict.getSubmittingUserId())
+                .deviceId(savedConflict.getDeviceId())
+                .serverVersion(savedConflict.getServerVersion())
+                .deviceVersion(savedConflict.getDeviceVersion())
+                .conflictingData(savedConflict.getConflictingData())
+                .resolutionStatus(savedConflict.getResolutionStatus())
+                .resolvedBy(savedConflict.getResolvedBy())
+                .resolvedAt(savedConflict.getResolvedAt())
+                .build();
+    }
+
+    public List<ConflictResponseDTO> getConflicts(String status) {
+
+        List<SyncConflictRegistry> conflicts;
+
+        if (status == null || status.isBlank()) {
+            conflicts = conflictRepository.findAll();
+        } else {
+            conflicts = conflictRepository.findByResolutionStatus(status);
+        }
+
+        return conflicts.stream()
+                .map(conflict -> ConflictResponseDTO.builder()
+                        .id(conflict.getId())
+                        .citizenId(conflict.getCitizenId())
+                        .submittingUserId(conflict.getSubmittingUserId())
+                        .deviceId(conflict.getDeviceId())
+                        .serverVersion(conflict.getServerVersion())
+                        .deviceVersion(conflict.getDeviceVersion())
+                        .conflictingData(conflict.getConflictingData())
+                        .resolutionStatus(conflict.getResolutionStatus())
+                        .resolvedBy(conflict.getResolvedBy())
+                        .resolvedAt(conflict.getResolvedAt())
+                        .build())
+                .toList();
+    }
+
+    public List<ConflictResponseDTO> getConflicts(
+            UUID wardId,
+            String status
+    ) {
+
+        List<SyncConflictRegistry> conflicts;
+
+        if (wardId != null) {
+
+            String actualStatus =
+                    (status == null || status.isBlank())
+                            ? "PENDING_REVIEW"
+                            : status;
+
+            conflicts =
+                    conflictRepository.findByWardIdAndResolutionStatus(
+                            wardId,
+                            actualStatus
+                    );
+
+        } else if (status != null && !status.isBlank()) {
+
+            conflicts =
+                    conflictRepository.findByResolutionStatus(status);
+
+        } else {
+
+            conflicts = conflictRepository.findAll();
+        }
+
+        return conflicts.stream()
+                .map(conflict -> ConflictResponseDTO.builder()
+                        .id(conflict.getId())
+                        .citizenId(conflict.getCitizenId())
+                        .submittingUserId(
+                                conflict.getSubmittingUserId()
+                        )
+                        .deviceId(conflict.getDeviceId())
+                        .serverVersion(
+                                conflict.getServerVersion()
+                        )
+                        .deviceVersion(
+                                conflict.getDeviceVersion()
+                        )
+                        .conflictingData(
+                                conflict.getConflictingData()
+                        )
+                        .resolutionStatus(
+                                conflict.getResolutionStatus()
+                        )
+                        .resolvedBy(
+                                conflict.getResolvedBy()
+                        )
+                        .resolvedAt(
+                                conflict.getResolvedAt()
+                        )
+                        .build())
+                .toList();
+    }
 
 }
