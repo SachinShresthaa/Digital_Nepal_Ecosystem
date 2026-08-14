@@ -37,6 +37,7 @@ public class EmploymentProfile {
     @Column(name = "sub_fields", columnDefinition = "jsonb")
     private Map<String, Object> subFields;
 
+    @Column(name = "income_band", length = 30)
     private String incomeBand;
 
     @Column(name = "updated_at")
