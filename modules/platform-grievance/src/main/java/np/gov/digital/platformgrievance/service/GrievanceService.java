@@ -7,13 +7,13 @@ import np.gov.digital.platformaudit.audit.AuditLogService;
 import np.gov.digital.platformgrievance.dto.GrievanceFileRequest;
 import np.gov.digital.platformgrievance.dto.GrievanceResponse;
 import np.gov.digital.platformgrievance.entity.Grievance;
+import np.gov.digital.platformgrievance.entity.GrievanceEvent;
 import np.gov.digital.platformgrievance.enums.GrievanceStatus;
+import np.gov.digital.platformgrievance.repository.GrievanceEventRepository;
 import np.gov.digital.platformgrievance.repository.GrievanceRepository;
 import np.gov.digital.platformgrievance.util.TrackingCodeGenerator;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,19 +25,20 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class GrievanceService {
 
-    // 48-hour SLA from filed_at (SDD 5.3 / Day 7 task doc)
     private static final Duration SLA_WINDOW = Duration.ofHours(48);
 
     private final GrievanceRepository grievanceRepository;
+    private final GrievanceEventRepository grievanceEventRepository;
     private final TrackingCodeGenerator trackingCodeGenerator;
     private final AuditLogService auditLogService;
 
     @Transactional
     public GrievanceResponse fileGrievance(GrievanceFileRequest request) {
 
-        UUID filedBy = extractActorId();
+        UUID filedBy      = getActorId();
+        String actorRole  = getActorRole();
         String trackingCode = trackingCodeGenerator.generate();
-        Instant now = Instant.now();
+        Instant now       = Instant.now();
 
         Grievance grievance = Grievance.builder()
                 .citizenId(request.getCitizenId())
@@ -57,15 +58,23 @@ public class GrievanceService {
 
         Grievance saved = grievanceRepository.save(grievance);
 
-        auditLogService.log(
-                AuditEventType.GRIEVANCE_SUBMITTED,
-                saved.getCitizenId(),
-                "Grievance filed — trackingCode=" + trackingCode
-                        + " category=" + request.getCategory()
-        );
+        // Write first event log entry (Day 8 requirement)
+        grievanceEventRepository.save(GrievanceEvent.builder()
+                .grievanceId(saved.getId())
+                .citizenId(saved.getCitizenId())
+                .eventType("GRIEVANCE_SUBMITTED")
+                .oldStatus(null)
+                .newStatus(GrievanceStatus.RECEIVED.name())
+                .actorId(filedBy)
+                .actorRole(actorRole)
+                .note("Grievance filed — category=" + request.getCategory())
+                .createdAt(now)
+                .build());
 
-        log.info("GrievanceService: filed grievance {} for citizen={} category={}",
-                trackingCode, request.getCitizenId(), request.getCategory());
+        auditLogService.log(AuditEventType.GRIEVANCE_SUBMITTED, saved.getCitizenId(),
+                "trackingCode=" + trackingCode + " category=" + request.getCategory());
+
+        log.info("GrievanceService: filed {} for citizen={}", trackingCode, request.getCitizenId());
 
         return GrievanceResponse.builder()
                 .id(saved.getId())
@@ -79,19 +88,27 @@ public class GrievanceService {
                 .build();
     }
 
-    private UUID extractActorId() {
+    private UUID getActorId() {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth instanceof JwtAuthenticationToken jwtAuth) {
-                Jwt jwt = jwtAuth.getToken();
-                Object sub = jwt.getClaims().get("sub");
-                if (sub != null) {
-                    return UUID.fromString(sub.toString());
-                }
+            if (auth != null && auth.getName() != null) {
+                return UUID.fromString(auth.getName());
             }
         } catch (Exception e) {
-            log.warn("GrievanceService: could not extract actor from JWT: {}", e.getMessage());
+            log.warn("GrievanceService: could not extract actor UUID: {}", e.getMessage());
         }
         return null;
+    }
+
+    private String getActorRole() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && !auth.getAuthorities().isEmpty()) {
+                return auth.getAuthorities().iterator().next().getAuthority();
+            }
+        } catch (Exception e) {
+            log.warn("GrievanceService: could not extract role: {}", e.getMessage());
+        }
+        return "UNKNOWN";
     }
 }
