@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import np.gov.digital.platformgrievance.enums.GrievanceCategory;
 import np.gov.digital.platformgrievance.enums.GrievanceStatus;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.List;
@@ -13,16 +15,12 @@ import java.util.UUID;
 @Table(
         name = "grievance",
         indexes = {
-                @Index(name = "idx_grievance_citizen", columnList = "citizen_id"),
-                @Index(name = "idx_grievance_status", columnList = "status"),
+                @Index(name = "idx_grievance_citizen",  columnList = "citizen_id"),
+                @Index(name = "idx_grievance_status",   columnList = "status"),
                 @Index(name = "idx_grievance_tracking", columnList = "tracking_code")
         }
 )
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Grievance {
 
     @Id
@@ -43,10 +41,10 @@ public class Grievance {
     @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "attachment_urls")
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "attachment_urls", columnDefinition = "text[]")
     private List<String> attachmentUrls;
 
-    // Format GRV-2026-000123 — unique, citizen-facing
     @Column(name = "tracking_code", nullable = false, unique = true, length = 20)
     private String trackingCode;
 
@@ -99,7 +97,6 @@ public class Grievance {
     @Builder.Default
     private Short reopenCount = 0;
 
-    // 48h SLA from filed_at — set at insert time in GrievanceService
     @Column(name = "sla_due_at")
     private Instant slaDueAt;
 

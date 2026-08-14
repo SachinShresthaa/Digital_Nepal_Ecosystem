@@ -53,7 +53,7 @@ public class Citizen {
     private String citizenshipNoEnc;
 
     // Alphanumeric-sanitized citizenship number (dashes and slashes stripped).
-    @Column(name = "citizen_no_norm", nullable = false, length = 100)
+    @Column(name = "citizenship_no_norm", nullable = false, length = 100)
     private String citizenshipNoNorm;
 
     // AES-256/GCM encrypted passport number. Nullable — not all citizens have passports.
