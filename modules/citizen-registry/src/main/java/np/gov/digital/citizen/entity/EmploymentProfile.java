@@ -5,8 +5,8 @@ import lombok.*;
 
 import java.time.Instant;
 import java.util.UUID;
-
-@Entity
+ 
+@Entity(name = "CitizenEmploymentProfile")
 @Table(name = "employment_profile")
 @Getter
 @Setter
