@@ -11,7 +11,6 @@ import np.gov.digital.platformgrievance.entity.Grievance;
 import np.gov.digital.platformgrievance.entity.GrievanceEvent;
 import np.gov.digital.platformgrievance.enums.GrievanceStatus;
 import np.gov.digital.platformgrievance.exception.GrievanceEscalationException;
-import np.gov.digital.platformgrievance.exception.InvalidGrievanceTransitionException;
 import np.gov.digital.platformgrievance.repository.GrievanceEventRepository;
 import np.gov.digital.platformgrievance.repository.GrievanceRepository;
 import np.gov.digital.platformgrievance.statemachine.GrievanceStateMachine;
@@ -22,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.UUID;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -31,6 +31,7 @@ public class GrievanceEscalationService {
     private final GrievanceEventRepository grievanceEventRepository;
     private final GrievanceNotificationService notificationService;
     private final AuditLogService auditLogService;
+
     @Transactional
     public GrievanceResponse escalateToJudicial(UUID grievanceId,
                                                 GrievanceEscalationRequest request,
@@ -38,9 +39,7 @@ public class GrievanceEscalationService {
 
         Grievance grievance = findGrievance(grievanceId);
 
-        // SAME-MUNICIPALITY CHECK — SDD 5.3 + Day 12 integration test
-        // The requesting municipality must match the grievance's municipality.
-        // This prevents cross-municipality escalation routing.
+        // SAME-MUNICIPALITY CHECK — SDD 5.3 + Day 12 integration checklist
         if (grievance.getMunicipalityId() != null &&
                 !grievance.getMunicipalityId().equals(request.getMunicipalityId())) {
             log.warn("GrievanceEscalationService: cross-municipality escalation " +
@@ -54,11 +53,10 @@ public class GrievanceEscalationService {
         // Validate state transition via state machine
         GrievanceStateMachine.validate(grievance.getStatus(), GrievanceStatus.REFERRED_JUDICIAL);
 
-        UUID actorId   = getActorId();
+        UUID actorId     = getActorId();
         String actorRole = getActorRole();
-        Instant now    = Instant.now();
+        Instant now      = Instant.now();
 
-        // Apply transition
         GrievanceStatus fromStatus = grievance.getStatus();
         grievance.setStatus(GrievanceStatus.REFERRED_JUDICIAL);
         grievance.setEscalatedAt(now);
@@ -80,20 +78,24 @@ public class GrievanceEscalationService {
                 .createdAt(now)
                 .build());
 
-        // Audit log
         auditLogService.log(AuditEventType.GRIEVANCE_RESOLVED, saved.getCitizenId(),
                 "Grievance " + saved.getTrackingCode() +
                         " escalated to Nyayik Samiti — reason: " + request.getReason());
 
-        // Notify the submitting Ward Admin via SMS
-        // SMS failure NEVER rolls back escalation — handled inside notification service
-        if (wardAdminMobile != null && !wardAdminMobile.isBlank()) {
-            notificationService.notifyWardAdminOfEscalation(
-                    wardAdminMobile,
-                    saved.getTrackingCode(),
-                    GrievanceStatus.REFERRED_JUDICIAL.name(),
-                    request.getReason()
-            );
+        // SMS notification — ALWAYS in try-catch so failure never rolls back escalation
+        try {
+            if (wardAdminMobile != null && !wardAdminMobile.isBlank()) {
+                notificationService.notifyWardAdminOfEscalation(
+                        wardAdminMobile,
+                        saved.getTrackingCode(),
+                        GrievanceStatus.REFERRED_JUDICIAL.name(),
+                        request.getReason()
+                );
+            }
+        } catch (Exception e) {
+            // SMS failure must NEVER roll back a committed escalation
+            log.error("GrievanceEscalationService: Ward Admin SMS failed for {} — {}",
+                    saved.getTrackingCode(), e.getMessage());
         }
 
         log.info("GrievanceEscalationService: {} escalated to REFERRED_JUDICIAL by actor={}",
@@ -102,11 +104,6 @@ public class GrievanceEscalationService {
         return buildResponse(saved, "Grievance escalated to Nyayik Samiti successfully.");
     }
 
-    /**
-     * Rejects a grievance as CLOSED_INVALID.
-     * Mandatory rejection reason required (SDD 5.3).
-     * Notifies Ward Admin via SMS.
-     */
     @Transactional
     public GrievanceResponse closeInvalid(UUID grievanceId,
                                           GrievanceRejectionRequest request,
@@ -114,12 +111,11 @@ public class GrievanceEscalationService {
 
         Grievance grievance = findGrievance(grievanceId);
 
-        // Validate state transition
         GrievanceStateMachine.validate(grievance.getStatus(), GrievanceStatus.CLOSED_INVALID);
 
-        UUID actorId   = getActorId();
+        UUID actorId     = getActorId();
         String actorRole = getActorRole();
-        Instant now    = Instant.now();
+        Instant now      = Instant.now();
 
         GrievanceStatus fromStatus = grievance.getStatus();
         grievance.setStatus(GrievanceStatus.CLOSED_INVALID);
@@ -130,7 +126,6 @@ public class GrievanceEscalationService {
 
         Grievance saved = grievanceRepository.save(grievance);
 
-        // Append event log
         grievanceEventRepository.save(GrievanceEvent.builder()
                 .grievanceId(saved.getId())
                 .citizenId(saved.getCitizenId())
@@ -147,13 +142,18 @@ public class GrievanceEscalationService {
                 "Grievance " + saved.getTrackingCode() +
                         " closed as invalid — reason: " + request.getRejectionReason());
 
-        // Notify Ward Admin
-        if (wardAdminMobile != null && !wardAdminMobile.isBlank()) {
-            notificationService.notifyWardAdminOfRejection(
-                    wardAdminMobile,
-                    saved.getTrackingCode(),
-                    request.getRejectionReason()
-            );
+        // SMS notification — ALWAYS in try-catch
+        try {
+            if (wardAdminMobile != null && !wardAdminMobile.isBlank()) {
+                notificationService.notifyWardAdminOfRejection(
+                        wardAdminMobile,
+                        saved.getTrackingCode(),
+                        request.getRejectionReason()
+                );
+            }
+        } catch (Exception e) {
+            log.error("GrievanceEscalationService: rejection SMS failed for {} — {}",
+                    saved.getTrackingCode(), e.getMessage());
         }
 
         log.info("GrievanceEscalationService: {} closed as CLOSED_INVALID by actor={}",
